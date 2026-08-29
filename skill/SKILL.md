@@ -1,6 +1,6 @@
 ---
 name: omnirecall
-description: Search the local cross-agent conversation archive covering every past Claude Code, Codex, OpenCode and Cursor session on this machine, regardless of which directory each agent was started in. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
+description: Search the local cross-agent conversation archive covering every past Claude Code, Codex, OpenCode, Cursor and Qoder session on this machine, regardless of which directory each agent was started in. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
 ---
 
 # omnirecall

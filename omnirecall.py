@@ -35,6 +35,10 @@ CODEX_DIR = HOME / ".codex" / "sessions"
 OPENCODE_DB = HOME / ".local" / "share" / "opencode" / "opencode.db"
 CURSOR_GLOBAL = HOME / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
 CURSOR_WS = HOME / "Library" / "Application Support" / "Cursor" / "User" / "workspaceStorage"
+QODER_DBS = (
+    HOME / "Library" / "Application Support" / "Qoder" / "SharedClientCache" / "cache" / "db" / "local.db",
+    HOME / "Library" / "Application Support" / "QoderCN" / "SharedClientCache" / "cache" / "db" / "local.db",
+)
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 SKIP_PREFIXES = ("<command", "<local-command", "Caveat:", "[Request interrupted", "<system-reminder>")
@@ -310,6 +314,91 @@ def index_cursor(con):
     return len(rows)
 
 
+# ---------------- Qoder ----------------
+
+def qoder_ts(v):
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)):
+        return ms_to_iso(v if v > 1e11 else v * 1000)
+    return str(v).replace(" ", "T")
+
+
+def index_qoder(con):
+    """Qoder: message contents are encrypted, but plaintext remains in
+    chat_session.session_title (often full task prompts), agent_memory rows,
+    and chat_message.summary (JSON conversation-continuation summaries).
+    The db may be locked by a running IDE, so read a temp copy."""
+    import shutil
+    import tempfile
+    n = 0
+    for qdb in QODER_DBS:
+        if not qdb.exists():
+            continue
+        key = str(qdb)
+        st = qdb.stat()
+        prev = con.execute("SELECT mtime, size FROM files WHERE path=?", (key,)).fetchone()
+        if prev and abs(prev[0] - st.st_mtime) < 1 and prev[1] == st.st_size:
+            continue
+        con.execute("DELETE FROM msgs WHERE file_path=?", (key,))
+        tmpdir = tempfile.mkdtemp(prefix="omnirecall-qoder-")
+        rows = []
+        try:
+            tmp = os.path.join(tmpdir, "local.db")
+            shutil.copy2(qdb, tmp)
+            for ext in ("-wal", "-shm"):
+                src = str(qdb) + ext
+                if os.path.exists(src):
+                    try:
+                        shutil.copy2(src, tmp + ext)
+                    except Exception:
+                        pass
+            try:
+                s = sqlite3.connect(tmp)
+            except Exception:
+                continue
+            try:
+                for sid, title, puri, gmt in s.execute(
+                        "SELECT session_id, session_title, project_uri, gmt_create FROM chat_session"):
+                    txt = clean_text(title or "")
+                    if not txt:
+                        continue
+                    project = (puri or "").replace("file://", "") or None
+                    rows.append(("qoder", project, sid, key, "user", qoder_ts(gmt), f"[Qoder会话] {txt}"))
+                for mid, title, content, gmt in s.execute(
+                        "SELECT id, title, content, gmt_create FROM agent_memory"):
+                    txt = clean_text(f"{title or ''}\n{content or ''}")
+                    if not txt:
+                        continue
+                    rows.append(("qoder", None, f"agent-memory-{mid}", key, "assistant", qoder_ts(gmt), txt))
+                for sid, summ in s.execute(
+                        "SELECT session_id, summary FROM chat_message WHERE summary IS NOT NULL AND summary != ''"):
+                    try:
+                        arr = json.loads(summ)
+                    except Exception:
+                        continue
+                    if not isinstance(arr, list):
+                        continue
+                    for item in arr:
+                        if not isinstance(item, dict):
+                            continue
+                        role = item.get("role")
+                        if role not in ("user", "assistant"):
+                            continue
+                        txt = clean_text(item.get("content") or "")
+                        if txt:
+                            rows.append(("qoder", None, sid, key, role, "", txt))
+            finally:
+                s.close()
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        insert_rows(con, rows)
+        con.execute("INSERT INTO files(path,mtime,size) VALUES(?,?,?) "
+                    "ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size=excluded.size",
+                    (key, st.st_mtime, st.st_size))
+        n += len(rows)
+    return n
+
 def reindex(db):
     db.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db)
@@ -319,6 +408,7 @@ def reindex(db):
         "codex": index_file_based(con, CODEX_DIR, parse_codex_file, recursive=True),
         "opencode": index_opencode(con),
         "cursor": index_cursor(con),
+        "qoder": index_qoder(con),
     }
     con.commit()
     print("index complete:")
@@ -412,7 +502,7 @@ TOOLS = [
         "name": "search_history",
         "description": (
             "Search ALL past AI coding-agent conversations on this machine "
-            "(Claude Code, Codex, OpenCode, Cursor), regardless of which folder each agent "
+            "(Claude Code, Codex, OpenCode, Cursor, Qoder), regardless of which folder each agent "
             "was started in. Use at task start or whenever the user says "
             "'we discussed this before' / 'I remember talking about X' to recover "
             "prior decisions and context. Works for Chinese and English keywords."
@@ -421,7 +511,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Keyword / phrase to look for"},
-                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor"],
+                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder"],
                            "description": "Optional: restrict to one tool's logs"},
                 "limit": {"type": "number", "description": "Max results (default 10)"},
             },
@@ -530,7 +620,7 @@ def main():
     sub.add_parser("index", help="incremental reindex of all agent transcripts")
     sp = sub.add_parser("search", help="search across all history")
     sp.add_argument("query")
-    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor"])
+    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder"])
     sp.add_argument("--limit", type=int, default=10)
     sub.add_parser("serve", help="run MCP stdio server")
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads JSON on stdin)")

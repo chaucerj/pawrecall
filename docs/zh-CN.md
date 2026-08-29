@@ -58,6 +58,7 @@ python3 omnirecall.py index                          # 增量索引（秒级）
 
 ## Roadmap
 
-- [ ] 更多数据源：Gemini CLI、Cursor 聊天导出（欢迎 PR，新增一个源 ≈ 30 行解析函数）
+- [x] 数据源：Claude Code / Codex / OpenCode / Cursor（全文）；Qoder（会话标题 + Agent 记忆 + 续写摘要，其正文为客户端加密无法解析）；Trae（加密私有库，暂无法索引，但 Trae 的 agent 可通过 CLI 兜底检索其他工具的历史）
+- [ ] 更多数据源：Gemini CLI、Windsurf 等（欢迎 PR，新增一个源 ≈ 30-60 行解析函数）
 - [ ] 可选的本地 embedding 语义模式（"记不清原话只记得意思"场景）
 - [ ] Homebrew / pipx 分发
