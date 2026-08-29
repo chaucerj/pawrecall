@@ -40,7 +40,10 @@ agent 会调用 `search_history`（看到是哪个工具、哪个项目、什么
 python3 omnirecall.py search "知识库"                # 全局搜索
 python3 omnirecall.py search "MCP" --source codex   # 只搜某工具的记录
 python3 omnirecall.py index                          # 增量索引（秒级）
+python3 omnirecall.py sessions --project jiuge-mall  # 会话分类目录（按项目隔离浏览）
 ```
+
+搜索默认可用 `--project` / `project` 参数限定目录，避免跨项目全量扫描；agent 的工具描述与 skill 已内置“作用域优先”规则。
 
 ## 评测
 

@@ -117,6 +117,21 @@ ranking; multi-word queries broken by spacing) — both fixed.
 Different tools, different philosophies: claude-mem *compresses* your history,
 omnirecall *indexes* it. Use both if you like — they don't conflict.
 
+## Scoped search & session catalog
+
+`search_history` accepts a `project` filter (directory substring). Agents are
+instructed — via the tool description, the skill, and the injected rules — to
+scope searches to the current project and go global only on explicit request.
+No keyword? Browse the classified session catalog instead:
+
+```bash
+python3 omnirecall.py sessions --project jiuge-mall     # one entry per chat: source, count, topic
+python3 omnirecall.py sessions --source cursor          # everything Cursor discussed
+```
+
+Via MCP, `list_sessions` exposes the same catalog to every agent. The index
+itself is local-only (`chmod 600`) and never leaves the machine.
+
 ## FAQ
 
 **Is my data sent anywhere?**

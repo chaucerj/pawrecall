@@ -28,6 +28,7 @@ python3 ~/omnirecall/omnirecall.py search "keyword" [--source claude|codex|openc
 
 ## Workflow
 
+0. **Scope first (data isolation)**: by default pass `project=<current directory name or path substring>` so you only search the current project's history — never scan other projects unless the user explicitly asks for cross-project/global search. Browse what was discussed in a project with `list_sessions`; replay one exact conversation with `read_session`
 1. Distill 1-3 keywords that would **literally appear in the conversation text**
    (Chinese and English both work; this is exact substring search, not semantic)
 2. Search; when presenting results, cite provenance (which tool · which project · when)

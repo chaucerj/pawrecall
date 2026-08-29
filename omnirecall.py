@@ -157,6 +157,7 @@ def ensure_db(con):
         CREATE INDEX IF NOT EXISTS idx_msgs_file ON msgs(file_path);
         CREATE INDEX IF NOT EXISTS idx_msgs_session ON msgs(session_id);
         CREATE INDEX IF NOT EXISTS idx_msgs_source ON msgs(source);
+        CREATE INDEX IF NOT EXISTS idx_msgs_project ON msgs(project);
     """)
 
 
@@ -424,10 +425,11 @@ def esc_like(q):
     return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def search(db, query, source=None, limit=10):
+def search(db, query, source=None, project=None, limit=10):
     """Whitespace-separated terms are ANDed: "RAGAS 课程基线" matches texts
     containing both parts regardless of their spacing in the original.
-    Ranked by timestamp (newest first), NOT insertion order."""
+    Ranked by timestamp (newest first), NOT insertion order.
+    project scopes results to one project directory — prefer it over full scans."""
     if not db.exists():
         return []
     terms = [t for t in (query or "").split() if t] or [str(query or "")]
@@ -438,6 +440,9 @@ def search(db, query, source=None, limit=10):
     if source:
         sql += " AND source=?"
         args.append(source)
+    if project:
+        sql += " AND project LIKE ? ESCAPE '\\'"
+        args.append(f"%{esc_like(project)}%")
     sql += " ORDER BY (ts = '') ASC, ts DESC LIMIT ?"
     args.append(min(max(limit * 25, 200), 2000))
     out = []
@@ -495,15 +500,62 @@ def read_session(db, session_id=None, file_path=None, limit=60):
     return f"{len(lines)} message(s):\n\n" + "\n\n".join(lines)
 
 
+def list_sessions(db, source=None, project=None, limit=50):
+    """Classified session catalog: one entry per conversation with project,
+    message count, time range, and the first user message as its topic."""
+    if not db.exists():
+        return []
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    sql = ("SELECT m.source, m.project, m.session_id, COUNT(*), MIN(m.ts), MAX(m.ts),"
+           " (SELECT text FROM msgs m2 WHERE m2.session_id = m.session_id AND m2.role='user'"
+           "  ORDER BY m2.id ASC LIMIT 1)"
+           " FROM msgs m WHERE 1=1")
+    args = []
+    if source:
+        sql += " AND m.source=?"
+        args.append(source)
+    if project:
+        sql += " AND m.project LIKE ? ESCAPE '\\'"
+        args.append(f"%{esc_like(project)}%")
+    sql += " GROUP BY m.source, m.session_id ORDER BY MAX(m.ts) DESC LIMIT ?"
+    args.append(int(limit))
+    home = HOME.as_posix()
+    out = []
+    for src, proj, sid, cnt, tmin, tmax, topic in con.execute(sql, args):
+        out.append({"source": src,
+                    "project": (proj or "").replace(home, "~") if proj else "",
+                    "session_id": sid or "",
+                    "messages": cnt,
+                    "first_ts": tmin or "",
+                    "last_ts": tmax or "",
+                    "topic": (topic or "")[:120].replace("\n", " ")})
+    con.close()
+    return out
+
+
+def fmt_sessions(rows):
+    if not rows:
+        return "No sessions match."
+    lines = [f"{len(rows)} session(s):"]
+    for i, r in enumerate(rows, 1):
+        lines.append(f"[{i}] {r['source']} · {r['messages']} msgs · {r['last_ts']} · {r['project'] or '(unknown project)'}")
+        lines.append(f"    topic: {r['topic'] or '(none)'}")
+        lines.append(f"    session: {r['session_id']}")
+    return "\n".join(lines)
+
+
 # ---------------- MCP server (stdio) ----------------
 
 TOOLS = [
     {
         "name": "search_history",
         "description": (
-            "Search ALL past AI coding-agent conversations on this machine "
+            "Search past AI coding-agent conversations on this machine "
             "(Claude Code, Codex, OpenCode, Cursor, Qoder), regardless of which folder each agent "
-            "was started in. Use at task start or whenever the user says "
+            "was started in. IMPORTANT scoping rule: pass the current project's directory name "
+            "(or path substring) as 'project' to search only that project's history; search "
+            "without 'project' (full scan) ONLY when the user explicitly asks for cross-project "
+            "or global search. Use at task start or whenever the user says "
             "'we discussed this before' / 'I remember talking about X' to recover "
             "prior decisions and context. Works for Chinese and English keywords."
         ),
@@ -513,9 +565,30 @@ TOOLS = [
                 "query": {"type": "string", "description": "Keyword / phrase to look for"},
                 "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder"],
                            "description": "Optional: restrict to one tool's logs"},
+                "project": {
+                    "type": "string",
+                    "description": "Project directory substring to scope results, e.g. current repo name. Prefer this over global search.",
+                },
                 "limit": {"type": "number", "description": "Max results (default 10)"},
             },
             "required": ["query"],
+        },
+    },
+    {
+        "name": "list_sessions",
+        "description": (
+            "List classified conversation sessions (one per chat), filterable by project "
+            "directory or source tool, newest first, with topic preview. Use to browse "
+            "what was discussed in a project instead of full-text search."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder"],
+                           "description": "Optional: restrict to one tool's logs"},
+                "project": {"type": "string", "description": "Project directory substring"},
+                "limit": {"type": "number", "description": "Max sessions (default 50)"},
+            },
         },
     },
     {
@@ -536,7 +609,11 @@ TOOLS = [
 def handle_call(db, name, args):
     if name == "search_history":
         return fmt_results(search(db, args.get("query", ""), args.get("source"),
-                                  int(args.get("limit", 10))), args.get("query", ""))
+                                  args.get("project"), int(args.get("limit", 10))),
+                            args.get("query", ""))
+    if name == "list_sessions":
+        return fmt_sessions(list_sessions(db, args.get("source"), args.get("project"),
+                                          int(args.get("limit", 50))))
     if name == "read_session":
         return read_session(db, args.get("session_id"), args.get("file_path"),
                             int(args.get("limit", 60)))
@@ -621,6 +698,11 @@ def main():
     sp = sub.add_parser("search", help="search across all history")
     sp.add_argument("query")
     sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder"])
+    sp.add_argument("--project", help="scope results to a project directory substring")
+    spp = sub.add_parser("sessions", help="list classified sessions by project/source")
+    spp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder"])
+    spp.add_argument("--project")
+    spp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--limit", type=int, default=10)
     sub.add_parser("serve", help="run MCP stdio server")
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads JSON on stdin)")
@@ -633,7 +715,9 @@ def main():
         except OSError:
             pass
     elif args.cmd == "search":
-        print(fmt_results(search(args.db, args.query, args.source, args.limit), args.query))
+        print(fmt_results(search(args.db, args.query, args.source, args.project, args.limit), args.query))
+    elif args.cmd == "sessions":
+        print(fmt_sessions(list_sessions(args.db, args.source, args.project, args.limit)))
     elif args.cmd == "serve":
         serve(args.db)
     elif args.cmd == "hook":
