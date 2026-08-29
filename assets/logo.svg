@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="PawRecall">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B2140"/>
+      <stop offset="1" stop-color="#3A2E5C"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- recall loop -->
+  <path d="M 341 119 A 170 170 0 1 1 171 119" fill="none" stroke="#FFB86B" stroke-width="18" stroke-linecap="round"/>
+  <path d="M 199 102 L 172 131 L 163 107 Z" fill="#FFB86B"/>
+  <!-- paw -->
+  <g fill="#FFF7EC">
+    <ellipse cx="256" cy="300" rx="80" ry="62"/>
+    <ellipse cx="163" cy="222" rx="28" ry="38" transform="rotate(-20 163 222)"/>
+    <ellipse cx="223" cy="192" rx="28" ry="40" transform="rotate(-7 223 192)"/>
+    <ellipse cx="289" cy="192" rx="28" ry="40" transform="rotate(7 289 192)"/>
+    <ellipse cx="349" cy="222" rx="28" ry="38" transform="rotate(20 349 222)"/>
+  </g>
+  <!-- trailing prints -->
+  <g fill="#FFF7EC" opacity="0.22">
+    <ellipse cx="92" cy="428" rx="20" ry="15"/>
+    <circle cx="72" cy="400" r="7"/>
+    <circle cx="92" cy="392" r="7"/>
+    <circle cx="112" cy="400" r="7"/>
+  </g>
+  <g fill="#FFF7EC" opacity="0.12">
+    <ellipse cx="150" cy="462" rx="13" ry="10"/>
+    <circle cx="137" cy="444" r="5"/>
+    <circle cx="150" cy="439" r="5"/>
+    <circle cx="163" cy="444" r="5"/>
+  </g>
+</svg>

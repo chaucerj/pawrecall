@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""omnirecall — zero-dependency cross-agent conversation history search.
+"""pawrecall — zero-dependency cross-agent conversation history search.
 
 One file. Python stdlib only. Indexes the local transcripts of multiple AI
 coding agents (Claude Code, Codex CLI, OpenCode, Cursor) into a single SQLite database,
@@ -7,12 +7,12 @@ then exposes them to ANY agent via MCP, CLI, or skill — regardless of which
 directory each agent was started in.
 
 Usage:
-  python3 omnirecall.py index                    incremental reindex
-  python3 omnirecall.py search "keyword"         CLI search (--source, --limit)
-  python3 omnirecall.py serve                    MCP stdio server
-  python3 omnirecall.py hook                     Claude Code UserPromptSubmit hook
+  python3 pawrecall.py index                    incremental reindex
+  python3 pawrecall.py search "keyword"         CLI search (--source, --limit)
+  python3 pawrecall.py serve                    MCP stdio server
+  python3 pawrecall.py hook                     Claude Code UserPromptSubmit hook
 
-Database: ~/.omnirecall/history.db  (override with --db or $OMNIRECALL_DB)
+Database: ~/.pawrecall/history.db  (override with --db or $OMNIRECALL_DB)
 
 MIT License — see LICENSE.
 """
@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 
 HOME = Path.home()
-PROG = "omnirecall"
+PROG = "pawrecall"
 
 CLAUDE_DIR = HOME / ".claude" / "projects"
 CODEX_DIR = HOME / ".codex" / "sessions"
@@ -50,7 +50,7 @@ def default_db():
     env = os.environ.get("OMNIRECALL_DB")
     if env:
         return Path(env)
-    return HOME / ".omnirecall" / "history.db"
+    return HOME / ".pawrecall" / "history.db"
 
 
 def ms_to_iso(ms):
@@ -342,7 +342,7 @@ def index_qoder(con):
         if prev and abs(prev[0] - st.st_mtime) < 1 and prev[1] == st.st_size:
             continue
         con.execute("DELETE FROM msgs WHERE file_path=?", (key,))
-        tmpdir = tempfile.mkdtemp(prefix="omnirecall-qoder-")
+        tmpdir = tempfile.mkdtemp(prefix="pawrecall-qoder-")
         rows = []
         try:
             tmp = os.path.join(tmpdir, "local.db")
@@ -467,7 +467,7 @@ def fmt_results(results, query):
     home = HOME.as_posix()
     if not results:
         return (f'No history matches "{query}". Try synonyms / more specific words, '
-                f"or reindex first: python3 omnirecall.py index")
+                f"or reindex first: python3 pawrecall.py index")
     lines = [f'{len(results)} result(s) for "{query}":']
     for i, r in enumerate(results, 1):
         proj = r["project"].replace(home, "~")
@@ -479,7 +479,7 @@ def fmt_results(results, query):
 
 def read_session(db, session_id=None, file_path=None, limit=60):
     if not db.exists():
-        return "Index not found. Run: python3 omnirecall.py index"
+        return "Index not found. Run: python3 pawrecall.py index"
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     if session_id:
         sql, args = "SELECT source,project,session_id,role,ts,text FROM msgs WHERE session_id=?", [session_id]
@@ -548,7 +548,7 @@ def fmt_sessions(rows):
 
 TOOLS = [
     {
-        "name": "search_history",
+        "name": "paw_search",
         "description": (
             "Search past AI coding-agent conversations on this machine "
             "(Claude Code, Codex, OpenCode, Cursor, Qoder), regardless of which folder each agent "
@@ -575,7 +575,7 @@ TOOLS = [
         },
     },
     {
-        "name": "list_sessions",
+        "name": "paw_sessions",
         "description": (
             "List classified conversation sessions (one per chat), filterable by project "
             "directory or source tool, newest first, with topic preview. Use to browse "
@@ -592,8 +592,8 @@ TOOLS = [
         },
     },
     {
-        "name": "read_session",
-        "description": "Read one indexed conversation session back in order. Get session_id or file_path from search_history results first.",
+        "name": "paw_read",
+        "description": "Read one indexed conversation session back in order. Get session_id or file_path from paw_search results first.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -607,14 +607,14 @@ TOOLS = [
 
 
 def handle_call(db, name, args):
-    if name == "search_history":
+    if name == "paw_search":
         return fmt_results(search(db, args.get("query", ""), args.get("source"),
                                   args.get("project"), int(args.get("limit", 10))),
                             args.get("query", ""))
-    if name == "list_sessions":
+    if name == "paw_sessions":
         return fmt_sessions(list_sessions(db, args.get("source"), args.get("project"),
                                           int(args.get("limit", 50))))
-    if name == "read_session":
+    if name == "paw_read":
         return read_session(db, args.get("session_id"), args.get("file_path"),
                             int(args.get("limit", 60)))
     return f"Unknown tool: {name}"
@@ -682,8 +682,8 @@ def hook():
         return
     low = prompt.lower()
     if any(k in prompt for k in HOOK_KEYWORDS) or any(k in low for k in HOOK_KEYWORDS):
-        print("[omnirecall] This message refers to past conversations. You MUST call "
-              "search_history (omnirecall server) to检索 local history before answering; "
+        print("[pawrecall] This message refers to past conversations. You MUST call "
+              "paw_search (pawrecall server) to检索 local history before answering; "
               "use read_session for full context. Never invent prior conclusions.")
     return
 
@@ -692,7 +692,7 @@ def hook():
 
 def main():
     ap = argparse.ArgumentParser(prog=PROG, description="Zero-dependency cross-agent AI conversation history search")
-    ap.add_argument("--db", type=Path, default=default_db(), help="SQLite db path (default ~/.omnirecall/history.db)")
+    ap.add_argument("--db", type=Path, default=default_db(), help="SQLite db path (default ~/.pawrecall/history.db)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("index", help="incremental reindex of all agent transcripts")
     sp = sub.add_parser("search", help="search across all history")

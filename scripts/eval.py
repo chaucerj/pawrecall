@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""omnirecall evaluation harness.
+"""pawrecall evaluation harness.
 
 Measures three things against a built index:
 
@@ -8,7 +8,7 @@ Measures three things against a built index:
   B. Query recall       — cut random substrings out of indexed messages, run the
                           real search path, and verify they are findable. Also
                           probes escaping edge cases (%, _, ', non-ASCII).
-  C. Labeled precision@3 — optional. Provide ~/.omnirecall/eval_cases.json:
+  C. Labeled precision@3 — optional. Provide ~/.pawrecall/eval_cases.json:
                           [{"query": "...", "expect_file_contains": "session-id-or-path"}]
                           Each case passes if the expected file appears in the top 3.
                           Keep this file local: session ids are semi-sensitive.
@@ -28,10 +28,10 @@ HOME = Path.home()
 CLAUDE_DIR = HOME / ".claude" / "projects"
 CODEX_DIR = HOME / ".codex" / "sessions"
 OPENCODE_DB = HOME / ".local" / "share" / "opencode" / "opencode.db"
-CASES_FILE = HOME / ".omnirecall" / "eval_cases.json"
+CASES_FILE = HOME / ".pawrecall" / "eval_cases.json"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from omnirecall import search, clean_text  # noqa: E402  (use the real search path)
+from pawrecall import search, clean_text  # noqa: E402  (use the real search path)
 
 
 def texts_from_claude(fp):
@@ -161,7 +161,7 @@ def test_query_recall(db, n, seed):
 def test_labeled(db):
     print("\n── C. 标注 precision@3（人工核对的真实会话用例）──")
     if not CASES_FILE.exists():
-        print("  未找到 ~/.omnirecall/eval_cases.json，跳过（格式见 scripts/eval.py 头注释）")
+        print("  未找到 ~/.pawrecall/eval_cases.json，跳过（格式见 scripts/eval.py 头注释）")
         return None
     cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))
     passed = 0
@@ -178,13 +178,13 @@ def test_labeled(db):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", type=Path, default=HOME / ".omnirecall" / "history.db")
+    ap.add_argument("--db", type=Path, default=HOME / ".pawrecall" / "history.db")
     ap.add_argument("--samples", type=int, default=60)
     ap.add_argument("--seed", type=int, default=7)
     args = ap.parse_args()
     if not args.db.exists():
-        sys.exit(f"索引不存在: {args.db} — 先运行 python3 omnirecall.py index")
-    print(f"omnirecall 评测 · db={args.db} · samples={args.samples} · seed={args.seed}")
+        sys.exit(f"索引不存在: {args.db} — 先运行 python3 pawrecall.py index")
+    print(f"pawrecall 评测 · db={args.db} · samples={args.samples} · seed={args.seed}")
     a = test_fidelity(args.db, args.samples, args.seed)
     b = test_query_recall(args.db, args.samples, args.seed)
     c = test_labeled(args.db)

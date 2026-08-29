@@ -1,6 +1,5 @@
 <div align="center">
-
-# omnirecall
+  <img src="assets/banner.svg" alt="PawRecall — every conversation leaves a print. Follow it back." width="100%">
 
 **Every conversation you've ever had with your AI coding agents — searchable by any of them.**
 
@@ -22,15 +21,15 @@ Every agent quietly saves its transcripts on your disk — but each one indexes 
 its own working directory, so `claude --resume` only knows about the folder you're in.
 Your history isn't lost. It's just scattered.
 
-**omnirecall** indexes all of those transcripts into one SQLite database and hands them
+**pawrecall** indexes all of those transcripts into one SQLite database and hands them
 back to every agent through a single MCP server — path-independent, agent-independent.
 
-## Why omnirecall
+## Why pawrecall
 
 - **One file, zero dependencies** — pure Python stdlib. No npm install, no Rust binary,
   no embedding model download, no daemon. Read the entire codebase in ten minutes.
 - **Perfect CJK search** — tokenizer-free substring matching. BM-25 and FTS-based tools
-  break on Chinese/Japanese text (no whitespace to tokenize); omnirecall doesn't care.
+  break on Chinese/Japanese text (no whitespace to tokenize); pawrecall doesn't care.
 - **Verbatim recall** — stores what was actually said, not an LLM-compressed summary.
   Free (no model calls), and the details survive.
 - **Three delivery channels** — an MCP server for any MCP-capable agent, a CLI for
@@ -39,8 +38,8 @@ back to every agent through a single MCP server — path-independent, agent-inde
 ## Install
 
 ```bash
-git clone https://github.com/chaucerj/omnirecall.git
-cd omnirecall && ./install.sh          # add --with-scheduler for 30-min auto-reindex (macOS)
+git clone https://github.com/chaucerj/pawrecall.git
+cd pawrecall && ./install.sh          # add --with-scheduler for 30-min auto-reindex (macOS)
 ```
 
 `install.sh` indexes your history, registers the MCP server (Claude Code if present),
@@ -54,22 +53,22 @@ Requirements: Python 3.9+ (that's it).
 
 > "I think we discussed resume project ordering with some AI before — find it."
 
-The agent calls `search_history` → sees which tool, which project, when → digs into
-`read_session` if it needs the full thread.
+The agent calls `paw_search` → sees which tool, which project, when → digs into
+`paw_read` if it needs the full thread.
 
 **From your terminal:**
 
 ```bash
-python3 omnirecall.py search "召回率"                  # global search
-python3 omnirecall.py search "MCP" --source codex      # one agent's logs only
-python3 omnirecall.py index                            # incremental reindex (seconds)
+python3 pawrecall.py search "召回率"                  # global search
+python3 pawrecall.py search "MCP" --source codex      # one agent's logs only
+python3 pawrecall.py index                            # incremental reindex (seconds)
 ```
 
 ## How it works
 
 ```
 ~/.claude/projects/**/*.jsonl ─┐
-~/.codex/sessions/**/*.jsonl  ─┼─→ omnirecall.py index ─→ ~/.omnirecall/history.db
+~/.codex/sessions/**/*.jsonl  ─┼─→ pawrecall.py index ─→ ~/.pawrecall/history.db
 opencode.db (SQLite)          ─┘                                   │
                                                                     │ MCP (stdio)  → any agent
                                                                     │ CLI          → you
@@ -89,10 +88,10 @@ your own corpus:
 - **B. Query recall** — cuts random substrings out of indexed messages and runs
   the real search path; probes escaping edge cases (`%`, `_`, quotes, CJK punctuation)
 - **C. Labeled precision@3** — optional; put your own ground-truth cases in
-  `~/.omnirecall/eval_cases.json` (see `scripts/eval_cases.example.json`)
+  `~/.pawrecall/eval_cases.json` (see `scripts/eval_cases.example.json`)
 
 ```bash
-python3 omnirecall.py --db /tmp/omr.db index
+python3 pawrecall.py --db /tmp/omr.db index
 python3 scripts/eval.py --db /tmp/omr.db --samples 300
 ```
 
@@ -104,7 +103,7 @@ ranking; multi-word queries broken by spacing) — both fixed.
 
 ## Comparison (as of Feb 2026 — check the repos for current state)
 
-| | **omnirecall** | [claude-mem](https://github.com/thedotmack/claude-mem) | [memex](https://github.com/nicosuave/memex) | [claude-historian-mcp](https://github.com/Vvkmnn/claude-historian-mcp) | [crispy-recall](https://github.com/TheSylvester/crispy-recall) |
+| | **pawrecall** | [claude-mem](https://github.com/thedotmack/claude-mem) | [memex](https://github.com/nicosuave/memex) | [claude-historian-mcp](https://github.com/Vvkmnn/claude-historian-mcp) | [crispy-recall](https://github.com/TheSylvester/crispy-recall) |
 |---|---|---|---|---|---|
 | Agents covered | Claude Code, Codex, OpenCode, Cursor, Qoder* | many | 10 CLI agents | Claude Code only | Claude Code + Codex |
 | Memory type | **verbatim transcripts** | LLM-compressed summaries | verbatim | verbatim | verbatim |
@@ -115,27 +114,27 @@ ranking; multi-word queries broken by spacing) — both fixed.
 | Model calls / cost | **none** | yes (compression) | optional (embeddings) | none | optional (local embeddings) |
 
 Different tools, different philosophies: claude-mem *compresses* your history,
-omnirecall *indexes* it. Use both if you like — they don't conflict.
+pawrecall *indexes* it. Use both if you like — they don't conflict.
 
 ## Scoped search & session catalog
 
-`search_history` accepts a `project` filter (directory substring). Agents are
+`paw_search` accepts a `project` filter (directory substring). Agents are
 instructed — via the tool description, the skill, and the injected rules — to
 scope searches to the current project and go global only on explicit request.
 No keyword? Browse the classified session catalog instead:
 
 ```bash
-python3 omnirecall.py sessions --project jiuge-mall     # one entry per chat: source, count, topic
-python3 omnirecall.py sessions --source cursor          # everything Cursor discussed
+python3 pawrecall.py sessions --project jiuge-mall     # one entry per chat: source, count, topic
+python3 pawrecall.py sessions --source cursor          # everything Cursor discussed
 ```
 
-Via MCP, `list_sessions` exposes the same catalog to every agent. The index
+Via MCP, `paw_sessions` exposes the same catalog to every agent. The index
 itself is local-only (`chmod 600`) and never leaves the machine.
 
 ## FAQ
 
 **Is my data sent anywhere?**
-No. Everything stays in `~/.omnirecall/` on your machine. The MCP server talks stdio,
+No. Everything stays in `~/.pawrecall/` on your machine. The MCP server talks stdio,
 not network.
 
 **Semantic search?** Not built in — this is exact substring search by design
