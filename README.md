@@ -32,6 +32,9 @@ back to every agent through a single MCP server — path-independent, agent-inde
   break on Chinese/Japanese text (no whitespace to tokenize); pawrecall doesn't care.
 - **Verbatim recall** — stores what was actually said, not an LLM-compressed summary.
   Free (no model calls), and the details survive.
+- **Deterministic trigger** — an optional UserPromptSubmit hook injects a "search first"
+  reminder whenever your message references past conversations (之前/上次/we discussed…),
+  so recall doesn't depend on the agent's goodwill.
 - **Three delivery channels** — an MCP server for any MCP-capable agent, a CLI for
   yourself, and a skill so agents know *when* to look.
 

@@ -71,6 +71,25 @@ PLIST
   echo "==> Scheduler installed (every 30 min). Log: $DEST/index.log"
 fi
 
+# --- Deterministic trigger hook (Claude Code, optional but recommended) -----
+cp "$(cd "$(dirname "$0")" && pwd)/scripts/prompt-hook.py" "$DEST/prompt-hook.py"
+"$PY" - "$PY" "$DEST" <<'EOF'
+import json, os, sys
+py, dest = sys.argv[1], sys.argv[2]
+p = os.path.expanduser("~/.claude/settings.json")
+cfg = {}
+if os.path.exists(p):
+    with open(p, encoding="utf-8") as f:
+        cfg = json.load(f)
+hooks = cfg.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
+entry = {"hooks": [{"type": "command", "command": py + " " + dest + "/prompt-hook.py"}]}
+if entry not in hooks:
+    hooks.append(entry)
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=2)
+print("==> Hook installed (UserPromptSubmit: says '之前/上次/we discussed' -> forced search reminder)")
+EOF
+
 cat <<EOF
 
 ==> Done.
