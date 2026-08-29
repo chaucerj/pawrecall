@@ -34,7 +34,9 @@ else
 fi
 
 # --- Skill installation -----------------------------------------------------
-for d in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
+# Codex (0.38+) and OpenCode read the same SKILL.md convention natively.
+for d in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.codex/skills" \
+         "$HOME/.config/opencode/skills"; do
   if [ -d "$d" ]; then
     ln -sfn "$(cd "$(dirname "$0")" && pwd)/skill" "$d/omnirecall"
     echo "==> Skill linked: $d/omnirecall"
