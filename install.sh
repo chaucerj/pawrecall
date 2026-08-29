@@ -34,9 +34,10 @@ else
 fi
 
 # --- Skill installation -----------------------------------------------------
-# Codex (0.38+) and OpenCode read the same SKILL.md convention natively.
+# Codex (0.38+), Cursor, Trae and Qoder all read the same SKILL.md convention.
 for d in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.codex/skills" \
-         "$HOME/.config/opencode/skills"; do
+         "$HOME/.config/opencode/skills" "$HOME/.cursor/skills" \
+         "$HOME/.trae/skills" "$HOME/.qoder/skills"; do
   if [ -d "$d" ]; then
     ln -sfn "$(cd "$(dirname "$0")" && pwd)/skill" "$d/omnirecall"
     echo "==> Skill linked: $d/omnirecall"
