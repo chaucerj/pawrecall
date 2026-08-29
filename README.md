@@ -106,7 +106,7 @@ ranking; multi-word queries broken by spacing) — both fixed.
 
 | | **omnirecall** | [claude-mem](https://github.com/thedotmack/claude-mem) | [memex](https://github.com/nicosuave/memex) | [claude-historian-mcp](https://github.com/Vvkmnn/claude-historian-mcp) | [crispy-recall](https://github.com/TheSylvester/crispy-recall) |
 |---|---|---|---|---|---|
-| Agents covered | Claude Code, Codex, OpenCode | many | 10 CLI agents | Claude Code only | Claude Code + Codex |
+| Agents covered | Claude Code, Codex, OpenCode, Cursor | many | 10 CLI agents | Claude Code only | Claude Code + Codex |
 | Memory type | **verbatim transcripts** | LLM-compressed summaries | verbatim | verbatim | verbatim |
 | Dependencies | **1 file, stdlib only** | runtime + models | Rust binary (brew) | Node/npm | Node + embedding runtime |
 | MCP server | ✓ | ✓ | — | ✓ | ✓ |
@@ -127,7 +127,8 @@ not network.
 (predictable, instant, zero cost). For "I know the concept but not the words" queries,
 the roadmap includes an optional local-embedding mode.
 
-**Which sources are indexed?** Currently Claude Code, Codex CLI, and OpenCode.
+**Which sources are indexed?** Currently Claude Code, Codex CLI, OpenCode, and
+Cursor (read from its global SQLite store, project-mapped via workspace metadata).
 Adding a new agent = one parser function (~30 lines). PRs welcome.
 
 **Does it store my secrets?** It indexes everything said in your conversations,

@@ -1,11 +1,11 @@
 ---
 name: omnirecall
-description: Search the local cross-agent conversation archive covering every past Claude Code, Codex and OpenCode session on this machine, regardless of which directory each agent was started in. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
+description: Search the local cross-agent conversation archive covering every past Claude Code, Codex, OpenCode and Cursor session on this machine, regardless of which directory each agent was started in. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
 ---
 
 # omnirecall
 
-Search ALL past AI agent conversations (Claude Code / Codex / OpenCode) on this
+Search ALL past AI agent conversations (Claude Code / Codex / OpenCode / Cursor) on this
 machine. Path-independent: works no matter which directory an agent was started in.
 
 ## Data
@@ -23,7 +23,7 @@ machine. Path-independent: works no matter which directory an agent was started 
 ## Fallback: CLI (when MCP tools are unavailable, run via bash)
 
 ```bash
-python3 ~/omnirecall/omnirecall.py search "keyword" [--source claude|codex|opencode] [--limit 20]
+python3 ~/omnirecall/omnirecall.py search "keyword" [--source claude|codex|opencode|cursor] [--limit 20]
 ```
 
 ## Workflow

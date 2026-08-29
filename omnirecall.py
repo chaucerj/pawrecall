@@ -2,7 +2,7 @@
 """omnirecall — zero-dependency cross-agent conversation history search.
 
 One file. Python stdlib only. Indexes the local transcripts of multiple AI
-coding agents (Claude Code, Codex CLI, OpenCode) into a single SQLite database,
+coding agents (Claude Code, Codex CLI, OpenCode, Cursor) into a single SQLite database,
 then exposes them to ANY agent via MCP, CLI, or skill — regardless of which
 directory each agent was started in.
 
@@ -33,6 +33,8 @@ PROG = "omnirecall"
 CLAUDE_DIR = HOME / ".claude" / "projects"
 CODEX_DIR = HOME / ".codex" / "sessions"
 OPENCODE_DB = HOME / ".local" / "share" / "opencode" / "opencode.db"
+CURSOR_GLOBAL = HOME / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+CURSOR_WS = HOME / "Library" / "Application Support" / "Cursor" / "User" / "workspaceStorage"
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 SKIP_PREFIXES = ("<command", "<local-command", "Caveat:", "[Request interrupted", "<system-reminder>")
@@ -212,6 +214,102 @@ def index_opencode(con):
     return len(rows)
 
 
+# ---------------- Cursor ----------------
+
+def strip_html(s):
+    return re.sub(r"<[^>]+>", " ", s or "")
+
+
+def cursor_project_map():
+    """composerId -> project path, via each workspace's composer.composerData."""
+    proj_by_composer = {}
+    if not CURSOR_WS.exists():
+        return proj_by_composer
+    for d in CURSOR_WS.iterdir():
+        wj, st = d / "workspace.json", d / "state.vscdb"
+        if not wj.exists() or not st.exists():
+            continue
+        try:
+            proj = (json.load(open(wj)).get("folder") or "")[8:] or None
+        except Exception:
+            proj = None
+        try:
+            s = sqlite3.connect(f"file:{st}?mode=ro", uri=True)
+            row = s.execute("SELECT value FROM ItemTable WHERE key='composer.composerData'").fetchone()
+            s.close()
+        except Exception:
+            continue
+        if not row or not row[0]:
+            continue
+        try:
+            doc = json.loads(row[0])
+        except Exception:
+            continue
+        for c in doc.get("allComposers") or []:
+            cid = c.get("composerId")
+            if cid:
+                proj_by_composer[cid] = proj
+    return proj_by_composer
+
+
+def index_cursor(con):
+    """Cursor stores message content globally: composerData:<id> docs hold ordered
+    refs (fullConversationHeadersOnly / conversationMap); text lives in separate
+    bubbleId:<composerId>:<bubbleId> rows."""
+    if not CURSOR_GLOBAL.exists():
+        return 0
+    key = str(CURSOR_GLOBAL)
+    st = CURSOR_GLOBAL.stat()
+    prev = con.execute("SELECT mtime, size FROM files WHERE path=?", (key,)).fetchone()
+    if prev and abs(prev[0] - st.st_mtime) < 1 and prev[1] == st.st_size:
+        return 0
+    con.execute("DELETE FROM msgs WHERE file_path=?", (key,))
+    proj_map = cursor_project_map()
+    sconn = sqlite3.connect(f"file:{CURSOR_GLOBAL}?mode=ro", uri=True)
+
+    def bubble_text(cid, bid):
+        row = sconn.execute("SELECT value FROM cursorDiskKV WHERE key=?", (f"bubbleId:{cid}:{bid}",)).fetchone()
+        if not row or not row[0]:
+            return None
+        try:
+            b = json.loads(row[0])
+        except Exception:
+            return None
+        return clean_text(b.get("text") or strip_html(b.get("richText") or ""))
+
+    rows = []
+    for k, v in sconn.execute("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"):
+        if not v:
+            continue
+        try:
+            doc = json.loads(v)
+        except Exception:
+            continue
+        cid = doc.get("composerId") or k.split(":", 1)[1]
+        ts = ms_to_iso(doc.get("lastUpdatedAt") or doc.get("createdAt"))
+        project = proj_map.get(cid)
+        cm = doc.get("conversationMap") or {}
+        if cm:
+            for b in cm.values():
+                if b.get("type") not in (1, 2):
+                    continue
+                txt = clean_text(b.get("text") or strip_html(b.get("richText") or ""))
+                if txt:
+                    rows.append(("cursor", project, cid, key, "user" if b.get("type") == 1 else "assistant", ts, txt))
+        for h in doc.get("fullConversationHeadersOnly") or []:
+            if h.get("type") not in (1, 2):
+                continue
+            txt = bubble_text(cid, h.get("bubbleId"))
+            if txt:
+                rows.append(("cursor", project, cid, key, "user" if h.get("type") == 1 else "assistant", ts, txt))
+    sconn.close()
+    insert_rows(con, rows)
+    con.execute("INSERT INTO files(path,mtime,size) VALUES(?,?,?) "
+                "ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size=excluded.size",
+                (key, st.st_mtime, st.st_size))
+    return len(rows)
+
+
 def reindex(db):
     db.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db)
@@ -220,6 +318,7 @@ def reindex(db):
         "claude": index_file_based(con, CLAUDE_DIR, parse_claude_file, recursive=False),
         "codex": index_file_based(con, CODEX_DIR, parse_codex_file, recursive=True),
         "opencode": index_opencode(con),
+        "cursor": index_cursor(con),
     }
     con.commit()
     print("index complete:")
@@ -313,7 +412,7 @@ TOOLS = [
         "name": "search_history",
         "description": (
             "Search ALL past AI coding-agent conversations on this machine "
-            "(Claude Code, Codex, OpenCode), regardless of which folder each agent "
+            "(Claude Code, Codex, OpenCode, Cursor), regardless of which folder each agent "
             "was started in. Use at task start or whenever the user says "
             "'we discussed this before' / 'I remember talking about X' to recover "
             "prior decisions and context. Works for Chinese and English keywords."
@@ -322,7 +421,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Keyword / phrase to look for"},
-                "source": {"type": "string", "enum": ["claude", "codex", "opencode"],
+                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor"],
                            "description": "Optional: restrict to one tool's logs"},
                 "limit": {"type": "number", "description": "Max results (default 10)"},
             },
@@ -431,7 +530,7 @@ def main():
     sub.add_parser("index", help="incremental reindex of all agent transcripts")
     sp = sub.add_parser("search", help="search across all history")
     sp.add_argument("query")
-    sp.add_argument("--source", choices=["claude", "codex", "opencode"])
+    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor"])
     sp.add_argument("--limit", type=int, default=10)
     sub.add_parser("serve", help="run MCP stdio server")
     sub.add_parser("hook", help="Claude Code UserPromptSubmit hook (reads JSON on stdin)")
