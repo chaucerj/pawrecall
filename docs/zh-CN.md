@@ -2,7 +2,7 @@
 
 **你与 AI coding agent 的每一次对话，都可以被任何一个 agent 随时检索。**
 
-单文件 · 零依赖 · MCP + CLI + skill 三通道。[English](../README.md)
+单文件 · 零依赖 · MCP + CLI + skill 三通道。[English](../README.md) · [日本語](ja.md)
 
 ## 解决什么问题
 

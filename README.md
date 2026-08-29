@@ -5,7 +5,7 @@
 
 One Python file. Zero dependencies. MCP + CLI + agent skill.
 
-[中文文档](docs/zh-CN.md) · MIT License
+[中文文档](docs/zh-CN.md) · [日本語](docs/ja.md) · MIT License
 
 </div>
 
