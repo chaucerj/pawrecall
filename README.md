@@ -157,6 +157,12 @@ Adding a new agent = one parser function (~30 lines). PRs welcome.
 **Does it store my secrets?** It indexes everything said in your conversations,
 so treat the DB like your transcripts: it's created `chmod 600`, local-only.
 
+## Contact & Support
+
+- 🐛 Bugs & feature requests: [open an issue](https://github.com/chaucerj/pawrecall/issues) — preferred, public discussion helps everyone
+- 📬 Private inquiries / commercial usage: **767092677@qq.com**
+- ⭐ If PawRecall saves you time, a star or a PR is the best support. Donation link lives in the sidebar ("Sponsor this project").
+
 ## License
 
 MIT

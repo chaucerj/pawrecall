@@ -66,3 +66,9 @@ python3 pawrecall.py sessions --project jiuge-mall  # 会话分类目录（按�
 - [ ] 更多数据源：Gemini CLI、Windsurf 等（欢迎 PR，新增一个源 ≈ 30-60 行解析函数）
 - [ ] 可选的本地 embedding 语义模式（"记不清原话只记得意思"场景）
 - [ ] Homebrew / pipx 分发
+
+## 联系与支持
+
+- 🐛 Bug 与功能建议：[提 GitHub Issue](https://github.com/chaucerj/pawrecall/issues)（优先，公开讨论让所有人受益）
+- 📬 私密咨询 / 商务合作：**767092677@qq.com**
+- ⭐ 如果 PawRecall 帮你省了时间，Star / PR 就是对作者最好的支持。赞助入口见仓库侧栏 "Sponsor this project"。
