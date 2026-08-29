@@ -1,0 +1,4 @@
+[
+  {"query": "example keyword", "expect_file_contains": "some-session-uuid-or-filename"},
+  {"query": "multi word query", "expect_file_contains": "another-file-stem"}
+]

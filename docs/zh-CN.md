@@ -20,7 +20,7 @@
 ## 安装
 
 ```bash
-git clone https://github.com/YOUR_NAME/omnirecall.git
+git clone https://github.com/chaucerj/omnirecall.git
 cd omnirecall && ./install.sh          # 加 --with-scheduler 启用每30分钟自动索引（macOS）
 ```
 
@@ -41,6 +41,12 @@ python3 omnirecall.py search "知识库"                # 全局搜索
 python3 omnirecall.py search "MCP" --source codex   # 只搜某工具的记录
 python3 omnirecall.py index                          # 增量索引（秒级）
 ```
+
+## 评测
+
+`scripts/eval.py` 在你自己的语料上量化整条管线：索引保真率（原文逐字回验，实测 100%）、
+随机子串查询召回（含转义边界用例，实测约 90%）、可选的人工标注 precision@3。
+开发期间该评测曾揪出两个真 bug（按插入序而非时间序排序；多词查询被空格破坏），均已修复。
 
 ## 与同类项目的区别（2026-02 时点）
 

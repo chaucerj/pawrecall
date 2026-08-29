@@ -39,7 +39,7 @@ back to every agent through a single MCP server — path-independent, agent-inde
 ## Install
 
 ```bash
-git clone https://github.com/YOUR_NAME/omnirecall.git
+git clone https://github.com/chaucerj/omnirecall.git
 cd omnirecall && ./install.sh          # add --with-scheduler for 30-min auto-reindex (macOS)
 ```
 
@@ -78,6 +78,29 @@ opencode.db (SQLite)          ─┘                                   │
 
 Indexing is incremental (mtime/size tracked per file). A LaunchAgent or cron job can
 keep it fresh every 30 minutes; without one, run `index` whenever you like.
+
+## Evaluation
+
+Don't take the numbers on faith — `scripts/eval.py` measures the pipeline on
+your own corpus:
+
+- **A. Indexing fidelity** — samples verbatim messages from the raw transcripts,
+  verifies each exists in the DB after by-design filtering (target: 100%)
+- **B. Query recall** — cuts random substrings out of indexed messages and runs
+  the real search path; probes escaping edge cases (`%`, `_`, quotes, CJK punctuation)
+- **C. Labeled precision@3** — optional; put your own ground-truth cases in
+  `~/.omnirecall/eval_cases.json` (see `scripts/eval_cases.example.json`)
+
+```bash
+python3 omnirecall.py --db /tmp/omr.db index
+python3 scripts/eval.py --db /tmp/omr.db --samples 300
+```
+
+Results on a ~32k-message corpus (macOS, Feb 2026): fidelity 100%, random-substring
+recall ≈ 90% (misses are top-K window truncation on very common substrings — the
+strings are in the DB, they just rank below the window), strict labeled precision@3
+5/6. The harness found two real bugs during development (timestamp-vs-insertion-order
+ranking; multi-word queries broken by spacing) — both fixed.
 
 ## Comparison (as of Feb 2026 — check the repos for current state)
 

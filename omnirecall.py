@@ -236,22 +236,29 @@ def esc_like(q):
 
 
 def search(db, query, source=None, limit=10):
+    """Whitespace-separated terms are ANDed: "RAGAS 课程基线" matches texts
+    containing both parts regardless of their spacing in the original.
+    Ranked by timestamp (newest first), NOT insertion order."""
     if not db.exists():
         return []
+    terms = [t for t in (query or "").split() if t] or [str(query or "")]
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    sql = "SELECT source,project,session_id,file_path,role,ts,text FROM msgs WHERE text LIKE ? ESCAPE '\\'"
-    args = [f"%{esc_like(query)}%"]
+    clauses = " AND ".join("text LIKE ? ESCAPE '\\'" for _ in terms)
+    sql = f"SELECT source,project,session_id,file_path,role,ts,text FROM msgs WHERE {clauses}"
+    args = [f"%{esc_like(t)}%" for t in terms]
     if source:
         sql += " AND source=?"
         args.append(source)
-    sql += " ORDER BY id DESC LIMIT ?"
-    args.append(min(limit * 4, 200))
+    sql += " ORDER BY (ts = '') ASC, ts DESC LIMIT ?"
+    args.append(min(max(limit * 25, 200), 2000))
     out = []
     for src, proj, sid, fpath, role, ts, text in con.execute(sql, args):
-        low, qlow = text.lower(), query.lower()
-        idx = low.find(qlow)
+        low = text.lower()
+        idx = min((low.find(t.lower()) for t in terms if low.find(t.lower()) >= 0), default=-1)
+        if idx < 0:
+            continue
         start = max(0, idx - 120)
-        end = min(len(text), idx + len(query) + 200)
+        end = min(len(text), idx + max(len(t) for t in terms) + 200)
         snippet = text[start:end].replace("\n", " ").strip()
         out.append({"source": src, "project": proj or "", "session_id": sid or "",
                     "file_path": fpath or "", "role": role or "", "ts": ts or "",
