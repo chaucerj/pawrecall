@@ -86,7 +86,7 @@ python3 scripts/eval.py --db /tmp/omr.db --samples 300
 
 | | **pawrecall** | [claude-mem](https://github.com/thedotmack/claude-mem) | [memex](https://github.com/nicosuave/memex) | [claude-historian-mcp](https://github.com/Vvkmnn/claude-historian-mcp) | [crispy-recall](https://github.com/TheSylvester/crispy-recall) |
 |---|---|---|---|---|---|
-| エージェント対応 | Claude Code, Codex, OpenCode, Cursor, Qoder* | 多数 | 10のCLIエージェント | Claude Codeのみ | Claude Code + Codex |
+| エージェント対応 | Claude Code, Codex, OpenCode, Cursor, Qoder*, ZCode | 多数 | 10のCLIエージェント | Claude Codeのみ | Claude Code + Codex |
 | 記憶の型 | **逐語トランスクリプト** | LLM圧縮要約 | 逐語 | 逐語 | 逐語 |
 | 依存関係 | **1ファイル・標準ライブラリのみ** | ランタイム+モデル | Rustバイナリ (brew) | Node/npm | Node + 埋め込みランタイム |
 | MCPサーバー | ✓ | ✓ | — | ✓ | ✓ |
@@ -114,7 +114,7 @@ MCP経由では `paw_sessions` が同じカタログをすべてのエージェ�
 
 **セマンティック検索は？** 組み込みではありません——設計上、正確な部分一致検索です（予測可能・即時・ゼロコスト）。「概念は覚えているのに言葉が出ない」クエリには、オプションのローカル埋め込みモードをロードマップに予定しています。
 
-**どのソースがインデックスされますか？** 現在 Claude Code、Codex CLI、OpenCode、Cursor（グローバルSQLiteストアから、ワークスペースメタデータでプロジェクトマッピング）、そして Qoder（セッションタイトル・エージェントメモリ・継続サマリー——メッセージ本体はクライアント側で暗号化されているため、平文のみインデックス）。Trae は独自の暗号化データベースにチャットを保存しており、インデックスできません。ただし Trae のエージェントはCLIフォールバックでインデックスを*検索*できます。
+**どのソースがインデックスされますか？** 現在 Claude Code、Codex CLI、OpenCode、Cursor（グローバルSQLiteストアから、ワークスペースメタデータでプロジェクトマッピング）、Qoder（セッションタイトル・エージェントメモリ・継続サマリー——メッセージ本体はクライアント側で暗号化されているため、平文のみインデックス）、そして ZCode Desktop（ロールアウトトランスクリプト `~/.zcode/cli/rollout/*.jsonl` から、ログ内の環境情報注入からプロジェクトパスを復元）。Trae は独自の暗号化データベースにチャットを保存しており、インデックスできません。ただし Trae のエージェントはCLIフォールバックでインデックスを*検索*できます。
 
 \* Qoder：タイトル/メモリ/サマリーのみ。
 新しいエージェントの追加 = パーサー関数1つ（約30行）。PRを歓迎します。

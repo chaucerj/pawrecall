@@ -2,7 +2,7 @@
 """pawrecall — zero-dependency cross-agent conversation history search.
 
 One file. Python stdlib only. Indexes the local transcripts of multiple AI
-coding agents (Claude Code, Codex CLI, OpenCode, Cursor) into a single SQLite database,
+coding agents (Claude Code, Codex CLI, OpenCode, Cursor, Qoder, ZCode) into a single SQLite database,
 then exposes them to ANY agent via MCP, CLI, or skill — regardless of which
 directory each agent was started in.
 
@@ -39,6 +39,7 @@ QODER_DBS = (
     HOME / "Library" / "Application Support" / "Qoder" / "SharedClientCache" / "cache" / "db" / "local.db",
     HOME / "Library" / "Application Support" / "QoderCN" / "SharedClientCache" / "cache" / "db" / "local.db",
 )
+ZCODE_DIR = HOME / ".zcode" / "cli" / "rollout"
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 SKIP_PREFIXES = ("<command", "<local-command", "Caveat:", "[Request interrupted", "<system-reminder>")
@@ -142,6 +143,108 @@ def parse_codex_file(fp):
                     if txt:
                         rows.append(("codex", project, sid, str(fp),
                                      payload.get("role") or "", obj.get("timestamp", "") or "", txt))
+    return rows
+
+
+# ---------------- ZCode ----------------
+
+ZCODE_CWD_RE = re.compile(r"Primary working directory:\s*(.+)")
+ZCODE_PATH_RE = re.compile(r"^[A-Za-z]:[/\\]|^/")
+
+
+def zcode_local_ts(v):
+    """ZCode stores UTC ISO timestamps ('2026-11-05T11:40:20.932Z');
+    convert to local ISO seconds like the other parsers."""
+    if not v:
+        return ""
+    try:
+        dt = datetime.datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone().isoformat(timespec="seconds")
+    except Exception:
+        return str(v)
+
+
+def _zcode_last_user_text(messages):
+    """Newest genuine user input in a request window. Tool results come back
+    as user-role records too — skip them; walk backwards to the real prompt."""
+    for m in reversed(messages):
+        if not isinstance(m, dict) or m.get("role") != "user":
+            continue
+        content = m.get("content")
+        if (isinstance(content, list) and content and isinstance(content[0], dict)
+                and content[0].get("type") == "tool_result"):
+            continue
+        if isinstance(content, str):
+            texts = [content]
+        elif isinstance(content, list):
+            texts = [b.get("text", "") for b in content
+                     if isinstance(b, dict) and b.get("type") == "text"]
+        else:
+            texts = []
+        for raw in texts:
+            txt = clean_text(raw)
+            if txt:
+                return txt
+    return None
+
+
+def _zcode_find_cwd(obj):
+    """ZCode strips the environment section from the logged system prompt, so the
+    project path only survives inside conversation content (environment-update
+    injections). Deep-walk the record for the first path-shaped match."""
+    stack = [obj]
+    while stack:
+        v = stack.pop()
+        if isinstance(v, str):
+            m = ZCODE_CWD_RE.search(v)
+            if m:
+                val = m.group(1).strip()
+                if ZCODE_PATH_RE.match(val):
+                    return val
+        elif isinstance(v, dict):
+            stack.extend(v.values())
+        elif isinstance(v, list):
+            stack.extend(v)
+    return None
+
+
+def parse_zcode_file(fp):
+    """ZCode Desktop rollout: one JSON record per model request/response —
+    {sessionId, startedAt(UTC), request.messages[window], response.text}.
+    The message window re-sends prior turns, so the newest real user message
+    repeats across consecutive records; dedupe those repeats. Windows use a
+    plain 'tool' role for tool results but user-role tool_result blocks also
+    occur, hence the block check in _zcode_last_user_text."""
+    rows = []
+    m = UUID_RE.search(fp.stem)
+    sid = m.group(0) if m else fp.stem
+    project = None
+    last_user = None
+    with open(fp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if project is None:
+                project = _zcode_find_cwd(obj)
+            ts = zcode_local_ts(obj.get("startedAt"))
+            req = obj.get("request") or {}
+            if isinstance(req.get("messages"), list):
+                user_txt = _zcode_last_user_text(req["messages"])
+                if user_txt and user_txt != last_user:
+                    last_user = user_txt
+                    rows.append(("zcode", project, sid, str(fp), "user", ts, user_txt))
+            asst_txt = clean_text((obj.get("response") or {}).get("text") or "")
+            if asst_txt:
+                rows.append(("zcode", project, sid, str(fp), "assistant", ts, asst_txt))
     return rows
 
 
@@ -410,6 +513,7 @@ def reindex(db):
         "opencode": index_opencode(con),
         "cursor": index_cursor(con),
         "qoder": index_qoder(con),
+        "zcode": index_file_based(con, ZCODE_DIR, parse_zcode_file, recursive=True),
     }
     con.commit()
     print("index complete:")
@@ -551,7 +655,7 @@ TOOLS = [
         "name": "paw_search",
         "description": (
             "Search past AI coding-agent conversations on this machine "
-            "(Claude Code, Codex, OpenCode, Cursor, Qoder), regardless of which folder each agent "
+            "(Claude Code, Codex, OpenCode, Cursor, Qoder, ZCode), regardless of which folder each agent "
             "was started in. IMPORTANT scoping rule: pass the current project's directory name "
             "(or path substring) as 'project' to search only that project's history; search "
             "without 'project' (full scan) ONLY when the user explicitly asks for cross-project "
@@ -563,7 +667,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Keyword / phrase to look for"},
-                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder"],
+                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode"],
                            "description": "Optional: restrict to one tool's logs"},
                 "project": {
                     "type": "string",
@@ -584,7 +688,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder"],
+                "source": {"type": "string", "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode"],
                            "description": "Optional: restrict to one tool's logs"},
                 "project": {"type": "string", "description": "Project directory substring"},
                 "limit": {"type": "number", "description": "Max sessions (default 50)"},
@@ -697,10 +801,10 @@ def main():
     sub.add_parser("index", help="incremental reindex of all agent transcripts")
     sp = sub.add_parser("search", help="search across all history")
     sp.add_argument("query")
-    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder"])
+    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode"])
     sp.add_argument("--project", help="scope results to a project directory substring")
     spp = sub.add_parser("sessions", help="list classified sessions by project/source")
-    spp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder"])
+    spp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode"])
     spp.add_argument("--project")
     spp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--limit", type=int, default=10)
