@@ -71,8 +71,10 @@ python3 pawrecall.py index                            # incremental reindex (sec
 
 ```
 ~/.claude/projects/**/*.jsonl ─┐
-~/.codex/sessions/**/*.jsonl  ─┼─→ pawrecall.py index ─→ ~/.pawrecall/history.db
-opencode.db (SQLite)          ─┘                                   │
+~/.codex/sessions/**/*.jsonl  ─┤
+opencode.db (SQLite)          ─┼─→ pawrecall.py index ─→ ~/.pawrecall/history.db
+Cursor / Qoder (SQLite)       ─┤                                   │
+~/.zcode/cli/rollout/*.jsonl  ─┘                                   │
                                                                     │ MCP (stdio)  → any agent
                                                                     │ CLI          → you
                                                                     └ skill        → when to look
@@ -108,7 +110,7 @@ ranking; multi-word queries broken by spacing) — both fixed.
 
 | | **pawrecall** | [claude-mem](https://github.com/thedotmack/claude-mem) | [memex](https://github.com/nicosuave/memex) | [claude-historian-mcp](https://github.com/Vvkmnn/claude-historian-mcp) | [crispy-recall](https://github.com/TheSylvester/crispy-recall) |
 |---|---|---|---|---|---|
-| Agents covered | Claude Code, Codex, OpenCode, Cursor, Qoder* | many | 10 CLI agents | Claude Code only | Claude Code + Codex |
+| Agents covered | Claude Code, Codex, OpenCode, Cursor, Qoder*, ZCode | many | 10 CLI agents | Claude Code only | Claude Code + Codex |
 | Memory type | **verbatim transcripts** | LLM-compressed summaries | verbatim | verbatim | verbatim |
 | Dependencies | **1 file, stdlib only** | runtime + models | Rust binary (brew) | Node/npm | Node + embedding runtime |
 | MCP server | ✓ | ✓ | — | ✓ | ✓ |
@@ -146,8 +148,11 @@ the roadmap includes an optional local-embedding mode.
 
 **Which sources are indexed?** Currently Claude Code, Codex CLI, OpenCode,
 Cursor (from its global SQLite store, project-mapped via workspace metadata),
-and Qoder (session titles, agent memories and continuation summaries — its
-message bodies are client-side encrypted, so only plaintext is indexed). Trae
+Qoder (session titles, agent memories and continuation summaries — its
+message bodies are client-side encrypted, so only plaintext is indexed), and
+ZCode Desktop (from its rollout transcripts `~/.zcode/cli/rollout/*.jsonl`,
+with the project path recovered from environment injections inside the logged
+conversation). Trae
 stores chats in an encrypted proprietary database and cannot be indexed; its
 agent can still *search* the index via the CLI fallback.
 

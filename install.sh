@@ -34,10 +34,14 @@ else
 fi
 
 # --- Skill installation -----------------------------------------------------
-# Codex (0.38+), Cursor, Trae and Qoder all read the same SKILL.md convention.
+# Codex (0.38+), Cursor, Trae, Qoder and ZCode all read the same SKILL.md convention.
+# ZCode never creates its skills dir until first use — make it when ZCode itself is present.
+if [ -d "$HOME/.zcode" ]; then
+  mkdir -p "$HOME/.zcode/skills"
+fi
 for d in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.codex/skills" \
          "$HOME/.config/opencode/skills" "$HOME/.cursor/skills" \
-         "$HOME/.trae/skills" "$HOME/.qoder/skills"; do
+         "$HOME/.trae/skills" "$HOME/.qoder/skills" "$HOME/.zcode/skills"; do
   if [ -d "$d" ]; then
     ln -sfn "$(cd "$(dirname "$0")" && pwd)/skill" "$d/pawrecall"
     echo "==> Skill linked: $d/pawrecall"
