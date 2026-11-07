@@ -1,0 +1,18 @@
+{
+  "_说明": "事实层配置（可选）。没有此文件且 Ollama 无 instruct 模型时，事实层自动禁用，行为与纯检索完全一致。",
+  "_用法": "复制为 ~/.pawrecall/facts.json 后按需修改。url 为 OpenAI 兼容基础地址。",
+  "_字段": {
+    "url": "OpenAI 兼容基础地址。Ollama 填 http://localhost:11434；火山方舟/OpenAI/SiliconFlow 等填各自 base url",
+    "model": "chat 模型名。本地推荐小模型（qwen3:4b / llama3.2:3b / gemma3:4b），提取任务不需要大模型",
+    "key": "API key，本地 Ollama 留空",
+    "sessions_per_run": "每次后台回填最多提取的会话数（LaunchAgent 每 30 分钟跑一次，3 个会话约几十秒）",
+    "conflict_mode": "矛盾处理策略：hitl（默认，模型只有提议权，挂起待人工裁决）| auto（直接信任模型推翻，旧行为）",
+    "auto_resolve_days": "大于 0 时，超过 N 天未裁决的矛盾按 new_wins 自动收敛（默认 0 = 永不自动裁决）"
+  },
+  "url": "http://localhost:11434",
+  "model": "qwen3:4b",
+  "key": "",
+  "sessions_per_run": 3,
+  "conflict_mode": "hitl",
+  "auto_resolve_days": 0
+}

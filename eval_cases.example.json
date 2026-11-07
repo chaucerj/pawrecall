@@ -1,0 +1,8 @@
+[
+  {"query": "口径红线",        "expect_file_contains": "rollout-2026-07-21T17-06-13"},
+  {"query": "RAGAS 课程基线",  "expect_file_contains": "0501f6cc"},
+  {"query": "Drools 规则引擎", "expect_file_contains": "08439d25"},
+  {"query": "dodo-agent",      "expect_file_contains": "0501f6cc"},
+  {"query": "九鸽",            "expect_file_contains": "08439d25"},
+  {"query": "HCIA-AI",         "expect_file_contains": "0501f6cc"}
+]
