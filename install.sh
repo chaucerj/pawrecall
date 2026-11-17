@@ -16,10 +16,13 @@ fi
 echo "    python3: $PY ($($PY --version 2>&1))"
 
 mkdir -p "$DEST"
-for f in index.py embed.py facts.py server.py eval.py standards.py prompt-hook.py \
+for f in index.py embed.py facts.py server.py eval.py standards.py \
          eval_cases.example.json embed.json.example facts.json.example; do
   [ -f "$SRC/$f" ] && cp "$SRC/$f" "$DEST/$f"
 done
+# prompt-hook.py lives in scripts/ — flatten it into $DEST (the registered hook
+# command runs $DEST/prompt-hook.py; a missing file makes Claude Code block prompts)
+[ -f "$SRC/scripts/prompt-hook.py" ] && cp "$SRC/scripts/prompt-hook.py" "$DEST/prompt-hook.py"
 chmod 600 "$DEST"/index.py "$DEST"/server.py 2>/dev/null || true
 
 echo "==> Building index (incremental; first run reads all transcripts)..."
