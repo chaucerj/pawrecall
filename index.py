@@ -35,6 +35,8 @@ QODER_DBS = (
     HOME / "Library" / "Application Support" / "QoderCN" / "SharedClientCache" / "cache" / "db" / "local.db",
 )
 ZCODE_DIR = HOME / ".zcode" / "cli" / "rollout"
+# Open Design：每个 namespace 一份 app.sqlite（WAL），messages 表存全量对话
+OPENDESIGN_NAMESPACES = HOME / "Library" / "Application Support" / "Open Design" / "namespaces"
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 SKIP_PREFIXES = ("<command", "<local-command", "Caveat:", "[Request interrupted", "<system-reminder>", "No response requested")
@@ -294,6 +296,8 @@ def parse_zcode_file(fp):
 
 def index_opencode(con):
     con.execute("DELETE FROM msgs WHERE source='opencode'")
+    if not OPENCODE_DB.exists():
+        return 0
     sconn = sqlite3.connect(f"file:{OPENCODE_DB}?mode=ro", uri=True)
     q = """
         SELECT s.directory,
@@ -530,6 +534,61 @@ def index_qoder(con):
         n += len(rows)
     return n
 
+def index_opendesign(con):
+    """Open Design: namespaces/*/data/app.sqlite（WAL，应用运行中可能持锁），
+    messages 表存 user/assistant 全量对话，projects 表给项目名。读临时副本。"""
+    import shutil
+    import tempfile
+    n = 0
+    for odb in OPENDESIGN_NAMESPACES.glob("*/data/app.sqlite"):
+        if not odb.exists():
+            continue
+        key = str(odb)
+        st = odb.stat()
+        prev = con.execute("SELECT mtime, size FROM files WHERE path=?", (key,)).fetchone()
+        if prev and abs(prev[0] - st.st_mtime) < 1 and prev[1] == st.st_size:
+            continue
+        con.execute("DELETE FROM msgs WHERE file_path=?", (key,))
+        tmpdir = tempfile.mkdtemp(prefix="pawrecall-opendesign-")
+        rows = []
+        try:
+            tmp = os.path.join(tmpdir, "app.sqlite")
+            shutil.copy2(odb, tmp)
+            for ext in ("-wal", "-shm"):
+                src = key + ext
+                if os.path.exists(src):
+                    try:
+                        shutil.copy2(src, tmp + ext)
+                    except Exception:
+                        pass
+            try:
+                s = sqlite3.connect(tmp)
+            except Exception:
+                continue
+            try:
+                proj = dict(s.execute("SELECT id, name FROM projects"))
+                for conv_id, project_id, conv_title, role, text, ts in s.execute(
+                        "SELECT m.conversation_id, c.project_id, c.title, m.role, m.content, m.created_at "
+                        "FROM messages m JOIN conversations c ON c.id = m.conversation_id "
+                        "WHERE m.content IS NOT NULL AND trim(m.content) != '' "
+                        "ORDER BY m.created_at"):
+                    txt = clean_text(text)
+                    if not txt:
+                        continue
+                    project = proj.get(project_id) or conv_title or project_id or None
+                    rows.append(("opendesign", project, conv_id, key, role or "", ms_to_iso(ts), txt))
+            finally:
+                s.close()
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        insert_rows(con, rows)
+        con.execute("INSERT INTO files(path,mtime,size) VALUES(?,?,?) "
+                    "ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size=excluded.size",
+                    (key, st.st_mtime, st.st_size))
+        n += len(rows)
+    return n
+
+
 def reindex():
     AI_DIR.mkdir(exist_ok=True)
     con = sqlite3.connect(DB_PATH)
@@ -540,9 +599,10 @@ def reindex():
     n_open = index_opencode(con)
     n_cursor = index_cursor(con)
     n_qoder = index_qoder(con)
+    n_od = index_opendesign(con)
     con.commit()
     print("索引完成：")
-    for src, n in (("claude", n_claude), ("codex", n_codex), ("zcode", n_zcode), ("opencode", n_open), ("cursor", n_cursor), ("qoder", n_qoder)):
+    for src, n in (("claude", n_claude), ("codex", n_codex), ("zcode", n_zcode), ("opencode", n_open), ("cursor", n_cursor), ("qoder", n_qoder), ("opendesign", n_od)):
         total = con.execute("SELECT COUNT(*) FROM msgs WHERE source=?", (src,)).fetchone()[0]
         print(f"  {src:9s} 本次新增 {n:6d} 条，库内共 {total:6d} 条")
     con.close()
@@ -779,12 +839,13 @@ def main():
     ap = argparse.ArgumentParser(description="Index/search all local AI agent conversation logs")
     ap.add_argument("--db", default=str(DB_PATH))
     sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("index", help="增量重建索引（无参数运行等价）")
     sp = sub.add_parser("search")
     sp.add_argument("query")
-    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode"])
+    sp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode", "opendesign"])
     sp.add_argument("--project", help="限定项目目录子串，如 'pet' 或完整路径")
     spp = sub.add_parser("sessions", help="按项目/源浏览会话分类目录")
-    spp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode"])
+    spp.add_argument("--source", choices=["claude", "codex", "opencode", "cursor", "qoder", "zcode", "opendesign"])
     spp.add_argument("--project")
     spp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--limit", type=int, default=10)

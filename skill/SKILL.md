@@ -1,11 +1,11 @@
 ---
 name: pawrecall
-description: Search the local cross-agent conversation archive covering every past Claude Code, Codex, OpenCode, Cursor, Qoder and ZCode session on this machine, regardless of which directory each agent was started in. Hybrid retrieval = exact keyword matching fused with semantic vector search (RRF), plus a distilled fact layer (decisions / preferences / constraints) ranked above raw transcripts. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
+description: Search the local cross-agent conversation archive covering every past Claude Code, Codex, OpenCode, Cursor, Qoder, ZCode and Open Design session on this machine, regardless of which directory each agent was started in. Hybrid retrieval = exact keyword matching fused with semantic vector search (RRF), plus a distilled fact layer (decisions / preferences / constraints) ranked above raw transcripts. Use when the user refers to previous conversations or prior decisions — e.g. 之前/上次/上回/记得/聊过/讨论过/以前, "we discussed this before", "I remember talking about X", "what did we decide last time" — or when a task needs context or conclusions from earlier sessions with any AI tool.
 ---
 
 # search-ai-history
 
-检索本机所有 AI agent（Claude Code / Codex / OpenCode / Cursor / Qoder / ZCode）的历史对话。索引按会话启动路径无关的方式统一存储，任何目录下都能查。
+检索本机所有 AI agent（Claude Code / Codex / OpenCode / Cursor / Qoder / ZCode / Open Design）的历史对话。索引按会话启动路径无关的方式统一存储，任何目录下都能查。
 
 ## 数据源
 
@@ -31,7 +31,7 @@ description: Search the local cross-agent conversation archive covering every pa
 ## 兜底方式：CLI（MCP 工具不可用时，用 bash 执行）
 
 ```bash
-python3 ~/.pawrecall/index.py search "关键词" [--mode auto|exact|semantic|facts] [--source claude|codex|opencode|cursor|qoder|zcode] [--limit 20]
+python3 ~/.pawrecall/index.py search "关键词" [--mode auto|exact|semantic|facts] [--source claude|codex|opencode|cursor|qoder|zcode|opendesign] [--limit 20]
 python3 ~/.pawrecall/index.py facts status    # 事实层状态
 python3 ~/.pawrecall/index.py facts run       # 手动补一轮事实提取（--sessions N 限量）
 python3 ~/.pawrecall/index.py embed --status  # 语义层状态

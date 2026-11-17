@@ -51,7 +51,7 @@ TOOLS = [
                 "query": {"type": "string", "description": "Keyword / phrase to look for"},
                 "source": {
                     "type": "string",
-                    "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode"],
+                    "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode", "opendesign"],
                     "description": "Optional: restrict to one tool's logs",
                 },
                 "project": {
@@ -80,7 +80,7 @@ TOOLS = [
             "properties": {
                 "source": {
                     "type": "string",
-                    "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode"],
+                    "enum": ["claude", "codex", "opencode", "cursor", "qoder", "zcode", "opendesign"],
                     "description": "Optional: restrict to one tool's logs",
                 },
                 "project": {"type": "string", "description": "Project directory substring"},
